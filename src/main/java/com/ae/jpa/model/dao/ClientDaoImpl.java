@@ -23,18 +23,28 @@ public class ClientDaoImpl implements ClientDao {
 
     @Transactional
     @Override
-    public void saveClient(ClientEntity client) {
-        ClientEntity clientEntity = new ClientEntity();
+    public void saveClient(final ClientEntity client) {
+        entityManager.persist(client);
+    }
 
-        if (client != null) {
-            clientEntity.setName(client.getName());
-            clientEntity.setLastName(client.getLastName());
-            clientEntity.setEmail(client.getEmail());
-            clientEntity.setCreateAt(new Date());
-
-            entityManager.persist(clientEntity);
+    @Transactional
+    @Override
+    public void updateClient(final ClientEntity client) {
+        if (client.getId() != null && client.getId() > 0) {
+            entityManager.merge(client);
+        } else {
+            entityManager.persist(client);
         }
+    }
 
+    @Override
+    public ClientEntity findClient(final Long id) {
+        return entityManager.find(ClientEntity.class, id);
+    }
+
+    @Override
+    public void deleteClient(final Long id) {
+        entityManager.remove(findClient(id));
     }
 
 

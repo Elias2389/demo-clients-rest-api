@@ -1,10 +1,10 @@
-package com.ae.jpa.model.dao;
+package com.ae.jpa.service;
 
 import com.ae.jpa.model.entity.ClientEntity;
 
 import java.util.List;
 
-public interface ClientDao {
+public interface ClientService {
 
     public List<ClientEntity> findAll();
 
