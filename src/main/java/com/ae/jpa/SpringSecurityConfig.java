@@ -14,8 +14,12 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import javax.sql.DataSource;
+
 @Configuration
 public class SpringSecurityConfig extends WebSecurityConfigurerAdapter {
+    @Autowired
+    private DataSource dataSource;
 
     @Bean
     public BCryptPasswordEncoder getBCryptPasswordEncoder() {
@@ -26,24 +30,18 @@ public class SpringSecurityConfig extends WebSecurityConfigurerAdapter {
     public void configureGlobal(final AuthenticationManagerBuilder builder) throws Exception {
         final PasswordEncoder passwordEncoder = getBCryptPasswordEncoder();
         User.UserBuilder userBuilder = User.builder().passwordEncoder(passwordEncoder::encode);
-        builder.inMemoryAuthentication()
-        .withUser(
-                userBuilder
-                .username("admin")
-                .password("123456")
-                .roles("ADMIN","USERS")
-        )
-        .withUser( userBuilder
-                .username("andres")
-                .password("123456")
-                .roles("USERS")
-        );
+        builder.jdbcAuthentication()
+                .dataSource(dataSource)
+                .passwordEncoder(passwordEncoder)
+                .usersByUsernameQuery("SELECT USERNAME, PASSWORD, ENABLED FROM DB_CLIENT.USERS WHERE USERNAME=?")
+                .authoritiesByUsernameQuery("SELECT U.USERNAME, A.AUTHORITY FROM DB_CLIENT.AUTHORITIES A INNER JOIN DB_CLIENT.USERS" +
+                        " U ON (A.USER_ID = U.ID) WHERE U.USERNAME =?");
     }
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http.authorizeRequests()
-                .antMatchers("/api/**").hasAnyRole("USERS", "ADMIN")
+                //.antMatchers("/api/**").hasAnyRole("ROLE_USER", "ROLE_ADMIN")
                 .anyRequest().authenticated()
                 .and()
                 //.addFilter(new JwtAuthenticationFilter(authenticationManager()))
