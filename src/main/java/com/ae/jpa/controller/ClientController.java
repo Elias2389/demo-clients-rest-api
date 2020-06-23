@@ -9,6 +9,7 @@ import java.util.Date;
 import java.util.List;
 
 @RestController
+@RequestMapping("/api")
 public class ClientController {
 
     @Autowired
@@ -56,4 +57,5 @@ public class ClientController {
         service.deleteClient(id);
         return "Listo";
     }
+
 }
