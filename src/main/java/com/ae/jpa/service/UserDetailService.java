@@ -40,12 +40,14 @@ public class UserDetailService implements UserDetailsService {
 
         for (RoleEntity role: user.getRoles()) {
             grantedAuthorityList.add(new SimpleGrantedAuthority(role.getAuthority()));
+            logger.info("ROLES: " + role.getAuthority());
         }
 
         if (grantedAuthorityList == null) {
             logger.error("User no tiene roles");
             throw new UsernameNotFoundException("User no tiene roles");
         }
+
 
         return new User(
                 user.getUsername(),
