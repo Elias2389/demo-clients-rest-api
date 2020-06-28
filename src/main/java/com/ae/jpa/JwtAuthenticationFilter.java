@@ -1,6 +1,7 @@
 package com.ae.jpa;
 
 import com.ae.jpa.model.entity.UserEntity;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -13,12 +14,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 import javax.servlet.FilterChain;
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -27,8 +25,12 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.ae.jpa.common.constants.KEY_HASH;
+
 
 public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilter {
+
+    private static final Long EXPIRATION_TIME = 3600000L;
 
     private final AuthenticationManager authenticationManager;
 
@@ -41,10 +43,10 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
     @Override
     public Authentication attemptAuthentication(HttpServletRequest request,
                                                 HttpServletResponse response) throws AuthenticationException {
-        logger.info("Username: " + obtainUsername(request));
-        logger.info("Password: " + obtainPassword(request));
-
         UserEntity user = getUserEntity(request);
+
+        logger.info("Username: " + user.getUsername());
+        logger.info("Password: " + user.getPassword());
 
         return authenticationManager
                 .authenticate(getAuthenticationToken(user.getUsername(), user.getPassword()));
@@ -59,27 +61,12 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
     protected void successfulAuthentication(HttpServletRequest request, HttpServletResponse response,
                                             FilterChain chain, Authentication authResult) throws IOException {
 
-        Collection<? extends GrantedAuthority> roles =  authResult.getAuthorities();
-
-        Claims claims = Jwts.claims();
-        claims .put("authorities", new ObjectMapper().writeValueAsString(roles));
-
-        UserEntity user = getUserEntity(request);
-
-        String token = Jwts.builder()
-                .setClaims(claims)
-                .setSubject(authResult.getName())
-                .signWith(Keys.hmacShaKeyFor("n2r5u8x/A%D*G-KaPdSgVkYp3s6v9y$B&E(H+MbQeThWmZq4t7w!z%C*F-J@NcRf".getBytes()), SignatureAlgorithm.HS512)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 3600000L))
-                .compact();
+        String token = getAuthenticationToken(authResult);
 
         response.addHeader("Authorization", "Bearer " + token);
 
-
         Map<String, Object> body = new HashMap<>();
         body.put("token", token);
-        body.put("user", user);
         body.put("message", "Login success");
 
         response.getWriter().write(new ObjectMapper().writeValueAsString(body));
@@ -106,5 +93,40 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
             e.printStackTrace();
             return new UserEntity();
         }
+    }
+
+    private Collection<? extends GrantedAuthority> getRoles(final Authentication authResult) {
+        return authResult.getAuthorities();
+    }
+
+    private Claims getClaims(final Authentication authResult) {
+        Claims claims = Jwts.claims();
+        try {
+            claims .put("authorities", new ObjectMapper().writeValueAsString(getRoles(authResult)));
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+        return claims;
+    }
+
+    private String getAuthenticationToken(final Authentication authResult) {
+        return Jwts.builder()
+                .setClaims(getClaims(authResult))
+                .setSubject(authResult.getName())
+                .signWith(
+                        Keys
+                        .hmacShaKeyFor(getKeyHash()),
+                        SignatureAlgorithm.HS512)
+                .setIssuedAt(new Date())
+                .setExpiration(getExpirationDate())
+                .compact();
+    }
+
+    private byte[] getKeyHash() {
+        return KEY_HASH.getBytes();
+    }
+
+    private Date getExpirationDate() {
+        return new Date(System.currentTimeMillis() + EXPIRATION_TIME);
     }
 }
